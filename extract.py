@@ -1,40 +1,58 @@
+# libraries
 import requests
 import json
-import os
-import time
 from datetime import datetime
+import time
+import os
+import logging
+
+#set up logging
+log_dir = 'logs'
+os.makedirs(log_dir,exist_ok=True)
+timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+log_filename = f'{log_dir}/{timestamp}.log'
+
+logging.basicConfig(
+    filename=log_filename,
+    format= '%(asctime)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+
+logger=logging.getLogger()
+logger.info('Logger initialised')
+
+# variables
+url = f"https://api.tfl.gov.uk/BikePoint/"
+response = requests.get(url)
+data = response.json()
 
 count = 0
-number_of_tries = 3
-url = 'https://api.tfl.gov.uk/BikePoint'
-timestamp = datetime.now().strftime('%Y-%m-%d %H-%M-%S')
+max_tries = 3
 
-while count < number_of_tries:
-    response = requests.get(url,timeout=10)
-    response_code = response.status_code
-    if response_code==200:
-        response_json = response.json()
-
-        #We need to check if the directory exists and make it if not
-        dir = 'data'
-        os.makedirs(dir, exist_ok=True)
-
-        filepath = f'{dir}/{timestamp}.json'
-
-        try:
-            with open(filepath,'w') as file:
-                json.dump(response_json, file)
-            print(f'Download successful at {timestamp} 😊')
-        except Exception as e:
-            print(e)
+while count < max_tries:
+    if 200 <= response.status_code < 300:
         
+        dir = 'data'
+        os.makedirs(dir,exist_ok=True)
+        filename = f"{dir}/{timestamp}.json"
+        with open(filename, "w") as file:
+            json.dump(data, file)
+                
+        print(f"File {filename} was successfully created. Woohoo 🥳")
+        logger.info(f"File {filename} was successfully created. Woohoo 🥳")
         break
 
-    elif response_code>499 or response_code<200:
-        #retry
-        print(response.reason)
+    elif response.status_code >= 500:
+        #retry after 10 seconds for these status codes
         time.sleep(10)
         count+=1
+        print(f'Trying again. Attempt {count}')
+        logger.info(f'Trying again. Attempt {count}')
+
     else:
-        print(response.reason)
+        print(f"Error: {response.status_code} {data.get("message","no message found")}")
+        logger.error(f"Error: {response.status_code} {data.get("message","no message found")}")
         break
+
+
+
